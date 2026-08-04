@@ -21,11 +21,11 @@ DATA: gs_header TYPE zfi_cash_book_hdr,
       gs_item   LIKE LINE OF gt_items.
 
 * Local variables for logic calculation
-DATA: lv_banks        TYPE banks,
-      lv_bankl        TYPE bankk,
-      lv_opening_bal  TYPE hslxx,
-      lv_run_bal      TYPE hslxx,
-      lv_count        TYPE int4.
+DATA: lv_banks       TYPE banks,
+      lv_bankl       TYPE bankk,
+      lv_opening_bal TYPE hslxx,
+      lv_run_bal     TYPE hslxx,
+      lv_count       TYPE int4.
 
 *----------------------------------------------------------------------*
 * SELECTION SCREEN
@@ -139,6 +139,7 @@ FORM get_transaction_data.
            hsl   TYPE acdoca-hsl,
            rhcur TYPE acdoca-rhcur,
            chect TYPE payr-chect, " Cheque Number from PAYR
+           zaldt TYPE payr-zaldt, " Added PAYR-ZALDT
          END OF ty_acdoca_payr.
 
   DATA: lt_data TYPE TABLE OF ty_acdoca_payr,
@@ -146,20 +147,21 @@ FORM get_transaction_data.
 
   " Fetch Line Items and Join with PAYR for Cheque Number
   " Logic: PAYR-ZBUKR = BUKRS, PAYR-HBKID = HBKID, PAYR-HKTID = HKTID, PAYR-VBLNR = BELNR
-  SELECT a~budat, a~sgtxt, a~hsl, a~rhcur, p~chect
-    FROM acdoca AS a
-    LEFT OUTER JOIN payr AS p ON  p~zbukr = a~rbukrs
-                              AND p~hbkid = a~hbkid
-                              AND p~hktid = a~hktid
-                              AND p~vblnr = a~belnr
-    INTO TABLE @lt_data
-    WHERE a~rbukrs = @p_bukrs
-      AND a~budat  IN @s_budat
-      AND a~hbkid  = @p_hbkid
-      AND a~hktid  = @p_hktid
-      AND a~rldnr  = '0L'
-      AND a~augbl  = @space
-    ORDER BY a~budat, a~belnr, a~docln.
+  SELECT a~budat, a~sgtxt, a~hsl, a~rhcur, p~chect, p~zaldt
+  FROM acdoca AS a
+  LEFT OUTER JOIN payr AS p ON  p~zbukr = a~rbukrs
+  AND p~hbkid = a~hbkid
+  AND p~hktid = a~hktid
+  AND p~vblnr = a~belnr
+  AND p~zaldt = a~budat
+  INTO TABLE @lt_data
+  WHERE a~rbukrs = @p_bukrs
+  AND a~budat  IN @s_budat
+  AND a~hbkid  = @p_hbkid
+  AND a~hktid  = @p_hktid
+  AND a~rldnr  = '0L'
+  AND a~augbl  = @space
+  ORDER BY a~budat, a~belnr, a~docln.
 
   " Initialize Totals
   CLEAR: gs_header-total_receipt, gs_header-total_payment.
@@ -174,6 +176,7 @@ FORM get_transaction_data.
     gs_item-particulars = ls_data-sgtxt.
     gs_item-currency    = ls_data-rhcur.
     gs_item-chect       = ls_data-chect. " Pass Cheque Number to output
+    gs_item-zaldt       = ls_data-zaldt. " Map PAYR-ZALDT if it exists in gt_items structure
 
     " Calculate Totals & Split Receipt/Payment
     IF ls_data-hsl >= 0.
@@ -247,8 +250,8 @@ ENDFORM.
 *& Form F4_FOR_HOUSE_BANK
 *&---------------------------------------------------------------------*
 FORM f4_for_house_bank.
-  DATA: lt_dynpfields  TYPE TABLE OF dynpread,
-        ls_dynpfield   TYPE dynpread.
+  DATA: lt_dynpfields TYPE TABLE OF dynpread,
+        ls_dynpfield  TYPE dynpread.
 
   " Read the Company Code directly from the screen UI
   ls_dynpfield-fieldname = 'P_BUKRS'.
@@ -275,15 +278,15 @@ FORM f4_for_house_bank.
     " Display the popup
     CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
       EXPORTING
-        retfield        = 'HBKID'
-        dynpprog        = sy-repid
-        dynpnr          = sy-dynnr
-        dynprofield     = 'P_HBKID'
-        value_org       = 'S'
+        retfield    = 'HBKID'
+        dynpprog    = sy-repid
+        dynpnr      = sy-dynnr
+        dynprofield = 'P_HBKID'
+        value_org   = 'S'
       TABLES
-        value_tab       = lt_house_banks
+        value_tab   = lt_house_banks
       EXCEPTIONS
-        OTHERS          = 1.
+        OTHERS      = 1.
   ELSE.
     MESSAGE 'Please enter a Company Code first.' TYPE 'S' DISPLAY LIKE 'E'.
   ENDIF.
@@ -293,10 +296,10 @@ ENDFORM.
 *& Form F4_FOR_ACCOUNT_ID
 *&---------------------------------------------------------------------*
 FORM f4_for_account_id.
-  DATA: lt_dynpfields  TYPE TABLE OF dynpread,
-        ls_dynpfield   TYPE dynpread,
-        lv_bukrs       TYPE bukrs,
-        lv_hbkid       TYPE hbkid.
+  DATA: lt_dynpfields TYPE TABLE OF dynpread,
+        ls_dynpfield  TYPE dynpread,
+        lv_bukrs      TYPE bukrs,
+        lv_hbkid      TYPE hbkid.
 
   " Read both BUKRS and HBKID from the screen UI
   ls_dynpfield-fieldname = 'P_BUKRS'. APPEND ls_dynpfield TO lt_dynpfields.
@@ -328,15 +331,15 @@ FORM f4_for_account_id.
     " Display the popup
     CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
       EXPORTING
-        retfield        = 'HKTID'
-        dynpprog        = sy-repid
-        dynpnr          = sy-dynnr
-        dynprofield     = 'P_HKTID'
-        value_org       = 'S'
+        retfield    = 'HKTID'
+        dynpprog    = sy-repid
+        dynpnr      = sy-dynnr
+        dynprofield = 'P_HKTID'
+        value_org   = 'S'
       TABLES
-        value_tab       = lt_account_ids
+        value_tab   = lt_account_ids
       EXCEPTIONS
-        OTHERS          = 1.
+        OTHERS      = 1.
   ELSE.
     MESSAGE 'Please enter Company Code and House Bank first.' TYPE 'S' DISPLAY LIKE 'E'.
   ENDIF.

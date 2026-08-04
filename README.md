@@ -37,8 +37,8 @@ Create the following Data Dictionary objects prior to creating the Form Interfac
 | RECEIPT | HSLXX | Receipt Amount (Positive HSL) |
 | PAYMENT | HSLXX | Payment Amount (Absolute Negative HSL) |
 | BALANCE | HSLXX | Running Balance |
-| CURRENCY | WAERS | Currency Key |
 | ZALDT | BUDAT | Posting Date |
+| CURRENCY | WAERS | Currency Key |
 
 ### **1.3 Table Type: ZTT\_CASH\_BOOK\_ITM**
 
